@@ -1,0 +1,5 @@
+langchain-ibm
+langchain-community
+pdfplumber
+python-dotenv
+streamlit
