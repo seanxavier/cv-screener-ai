@@ -15,8 +15,6 @@ import tempfile
 import pandas as pd
 import json
 
-from sample_data import job_post_exp_software_engineer, resume_patrick_mccury, resume_john_smith, resumes
-
 from dotenv import load_dotenv
 
 load_dotenv()
