@@ -305,11 +305,11 @@ def streamlit_app():
                 
                 # st.write(jsonify_output)
                 
-                with st.expander(f"{jsonify_output["name"]}"):
-                    st.write(f"Candidate Name: {jsonify_output["name"]}")
-                    st.write(f"Suitability: {jsonify_output["suitability"]}")
-                    st.write(f"Score: {jsonify_output["score"]}")
-                    st.write(f"Recommended: {jsonify_output["recommended"]}")
+                with st.expander(f"{jsonify_output['name']}"):
+                    st.write(f"Candidate Name: {jsonify_output['name']}")
+                    st.write(f"Suitability: {jsonify_output['suitability']}")
+                    st.write(f"Score: {jsonify_output['score']}")
+                    st.write(f"Recommended: {jsonify_output['recommended']}")
                     
                     st.write("Detailed Assessment")
                     st.write(jsonify_output["detailed_assessment"])
