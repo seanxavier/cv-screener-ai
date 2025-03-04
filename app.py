@@ -321,17 +321,18 @@ def streamlit_app():
             df = pd.DataFrame(assessment_report)
             # print(df)
             # filter out the detailed assessment in the table summary.
-            df_overview = df[["name", "suitability", "score", "recommended"]]
+            df_overview = df[["name", "suitability", "score", "recommended"]].sort_values(by="score", ascending=False)
             st.dataframe(df_overview, column_config={
                 "Name": st.column_config.Column(label="Candidate Name",width="medium"), 
                 "Suitability": st.column_config.Column(label="Suitability",width="small"),
                 "Score": st.column_config.Column(label="Score",width="small"),
                 "Recommended": st.column_config.Column(label="Recommended",width="small"),
                 # "Detailed Assessment": st.column_config.Column(label="Detailed Assessment",width="large"),
-            })
+                },
+                hide_index=True)
     
     with col2:
-        with st.container():
+        with st.container(key="wrapper-chat-history"):
             st.subheader("Assistant")
             # Initialize chat history
             if "messages" not in st.session_state:
@@ -379,14 +380,22 @@ def streamlit_app():
                 }
                 .st-key-chat-history {
                     position: fixed;
-                    bottom: 110;
-                    width: auto;
-                    height: 500px;
+                    bottom: 70px;
+                    width: 35vw;
+                    height: 420px;
                     overflow: auto;
-                    border: 1px solid white
+                    
+                    
+                }
+                
+                .st-key-wrapper-chat-history{
+                    position: fixed;
+                    bottom: 5px;
+                    height: 550px;
+                    width: 37vw;
+                    padding: 12px;
+                    border: 1px solid white;
                     border-radius: 10px;
-                    
-                    
                 }
                 </style>
                 """,
