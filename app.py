@@ -228,6 +228,18 @@ def extract_text_from_pdfs(uploaded_files):
 
 ##### -----  START STREAMLIT APP  ######
 
+def display_detailed_assessments(individual_assessments):
+    if len(individual_assessments)  > 0:
+        st.subheader("Detailed Assessments", divider="gray")
+        for assessment in individual_assessments:
+            with st.expander(f"{assessment['name']}"):
+                st.write(f"Candidate Name: {assessment['name']}")
+                st.write(f"Suitability: {assessment['suitability']}")
+                st.write(f"Score: {assessment['score']}")
+                st.write(f"Recommended: {assessment['recommended']}")
+                
+                st.write("Detailed Assessment")
+                st.write(assessment["detailed_assessment"])
 
 def streamlit_app():
     st.set_page_config(
@@ -364,24 +376,15 @@ def streamlit_app():
             #     # "Detailed Assessment": st.column_config.Column(label="Detailed Assessment",width="large"),
             #     },
             #     hide_index=True)
+        else:
+            display_detailed_assessments(st.session_state.individual_assessment)
             
-            
-        st.write()
         # show indiv assessment every run using state history, this is done so that it will be displayed every interaction with chat
-        st.subheader("Detailed Assessments", divider="gray")
-        for assessment in st.session_state.individual_assessment:
-            with st.expander(f"{assessment['name']}"):
-                st.write(f"Candidate Name: {assessment['name']}")
-                st.write(f"Suitability: {assessment['suitability']}")
-                st.write(f"Score: {assessment['score']}")
-                st.write(f"Recommended: {assessment['recommended']}")
-                
-                st.write("Detailed Assessment")
-                st.write(assessment["detailed_assessment"])
+        
                 
         # show dataframe every run using state history, this is done so that it will be displayed every interaction with chat
         for df_overview in st.session_state.overview_assessment:
-            st.write("df from state")
+            st.subheader("Assessment Summary", divider="gray")
             st.dataframe(df_overview, column_config={
             "Name": st.column_config.Column(label="Candidate Name",width="medium"), 
             "Suitability": st.column_config.Column(label="Suitability",width="small"),
