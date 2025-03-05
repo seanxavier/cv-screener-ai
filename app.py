@@ -17,6 +17,8 @@ import json
 
 from dotenv import load_dotenv
 import time
+
+from graph.graph import graphApp
 load_dotenv()
 
 IBM_CLOUD_URL= os.environ["IBM_CLOUD_URL"]
@@ -235,6 +237,20 @@ def streamlit_app():
         initial_sidebar_state="expanded"
     )
     st.header("Candidate Assessment powered by watsonx 💬")
+    
+    # Initialize assessment state and chat history state
+    if "individual_assessment" not in st.session_state:
+        st.session_state.individual_assessment = []
+    if "overview_assessment" not in st.session_state:
+        st.session_state.overview_assessment = []
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    if "job_posting" not in st.session_state:
+        st.session_state.job_posting = []
+    if "resumes" not in st.session_state:
+        st.session_state.resumes = []
+        
+        
 
     # Sidebar contents
     with st.sidebar:
@@ -274,11 +290,11 @@ def streamlit_app():
         st.write("Upload job posting and cadidate CVs then click generate.")    
         uploaded_job_file = st.file_uploader("Choose Job Posting PDF files",  type=["pdf"], accept_multiple_files=False)
         uploaded_cv_files = st.file_uploader("Choose Candidate CV PDF files",  type=["pdf"], accept_multiple_files=True)
-
-        if uploaded_job_file is not None and uploaded_cv_files is not None:
-            generate_button_disabled = False
-        else:
+        
+        if uploaded_job_file is None or len(uploaded_cv_files) ==0:
             generate_button_disabled = True
+        else:
+            generate_button_disabled = False
             
             
         assessment_report = []
@@ -287,14 +303,21 @@ def streamlit_app():
             # Exctract the pdf files
             extracted_job_file_data = extract_text_from_pdfs(uploaded_job_file)
             job_posting_extracted_text = next(iter(extracted_job_file_data.values()))
-            extracted_cv_file_data = extract_text_from_pdfs(uploaded_cv_files)
+            st.session_state.job_posting.append(job_posting_extracted_text)
             
+            extracted_cv_file_data = extract_text_from_pdfs(uploaded_cv_files)
+            st.session_state.resumes.append(extracted_cv_file_data)
+            
+                
             # Start generating the assessments
             st.subheader("Detailed Assessments", divider="gray")
             for index, (key, value) in enumerate(extracted_cv_file_data.items()):
                 with st.spinner(f"Analyzing resume ({index+1}/{len(extracted_cv_file_data)}): {key}...", show_time=True):
                     json_string_output_raw=llm.generate_text(
-                        prompt=generate_json_prompt.format(json_schema=json_schema,candidate_resume_text=value, job_posting_text=job_posting_extracted_text),
+                        prompt=generate_json_prompt.format(
+                            json_schema=json_schema,
+                            candidate_resume_text=value, 
+                            job_posting_text=job_posting_extracted_text),
                         )
                     logger.debug(f"json_string_output_raw:")
                     logger.debug(json_string_output_raw)
@@ -302,6 +325,11 @@ def streamlit_app():
                     logger.debug(f"json_string_output_clean:")
                     logger.debug(json_string_output_clean)
                     jsonify_output = json.loads(json_string_output_clean)
+                    
+                    # Add extracted_cv_file_data to individual assessment state
+                    st.session_state.individual_assessment.append(jsonify_output)
+                    
+                    
                     logger.debug(f"jsonify_output:")
                     logger.debug(jsonify_output)
                     assessment_report.append(jsonify_output)
@@ -316,28 +344,56 @@ def streamlit_app():
                         
                         st.write("Detailed Assessment")
                         st.write(jsonify_output["detailed_assessment"])
+                        
+            
 
             st.subheader("Assessment Summary", divider="gray")
             df = pd.DataFrame(assessment_report)
             # print(df)
             # filter out the detailed assessment in the table summary.
             df_overview = df[["name", "suitability", "score", "recommended"]].sort_values(by="score", ascending=False)
+            
+            # Add df_overview to overview assessment state
+            st.session_state.overview_assessment.append(df_overview)
+            
+            # st.dataframe(df_overview, column_config={
+            #     "Name": st.column_config.Column(label="Candidate Name",width="medium"), 
+            #     "Suitability": st.column_config.Column(label="Suitability",width="small"),
+            #     "Score": st.column_config.Column(label="Score",width="small"),
+            #     "Recommended": st.column_config.Column(label="Recommended",width="small"),
+            #     # "Detailed Assessment": st.column_config.Column(label="Detailed Assessment",width="large"),
+            #     },
+            #     hide_index=True)
+            
+            
+        st.write()
+        # show indiv assessment every run using state history, this is done so that it will be displayed every interaction with chat
+        st.subheader("Detailed Assessments", divider="gray")
+        for assessment in st.session_state.individual_assessment:
+            with st.expander(f"{assessment['name']}"):
+                st.write(f"Candidate Name: {assessment['name']}")
+                st.write(f"Suitability: {assessment['suitability']}")
+                st.write(f"Score: {assessment['score']}")
+                st.write(f"Recommended: {assessment['recommended']}")
+                
+                st.write("Detailed Assessment")
+                st.write(assessment["detailed_assessment"])
+                
+        # show dataframe every run using state history, this is done so that it will be displayed every interaction with chat
+        for df_overview in st.session_state.overview_assessment:
+            st.write("df from state")
             st.dataframe(df_overview, column_config={
-                "Name": st.column_config.Column(label="Candidate Name",width="medium"), 
-                "Suitability": st.column_config.Column(label="Suitability",width="small"),
-                "Score": st.column_config.Column(label="Score",width="small"),
-                "Recommended": st.column_config.Column(label="Recommended",width="small"),
-                # "Detailed Assessment": st.column_config.Column(label="Detailed Assessment",width="large"),
-                },
-                hide_index=True)
+            "Name": st.column_config.Column(label="Candidate Name",width="medium"), 
+            "Suitability": st.column_config.Column(label="Suitability",width="small"),
+            "Score": st.column_config.Column(label="Score",width="small"),
+            "Recommended": st.column_config.Column(label="Recommended",width="small"),
+            # "Detailed Assessment": st.column_config.Column(label="Detailed Assessment",width="large"),
+            },
+            hide_index=True)        
     
     with col2:
         with st.container(key="wrapper-chat-history"):
             st.subheader("Assistant")
-            # Initialize chat history
-            if "messages" not in st.session_state:
-                st.session_state.messages = []
-
             # Create a container for the chat history with scrollable behavior
             chat_history_container = st.container( key="chat-history" )
 
@@ -356,15 +412,24 @@ def streamlit_app():
                         st.chat_message("user").markdown(prompt)
                     # Add user message to chat history
                     st.session_state.messages.append({"role": "user", "content": prompt})
-
-                    response = f"Echo: {prompt}"
+                    # thread = {"configurable": {"thread_id": "1"}}
+                    
+                    chat_input = {
+                    "resumes": st.session_state.resumes, 
+                    "job_posting": st.session_state.job_posting, 
+                    "question":prompt, 
+                    "individual_assessments" : st.session_state.individual_assessment
+                    }
+                    
+                    response = graphApp.invoke(input=chat_input)
+                    generated_response = response["generation"]
                     # Display assistant response in chat message container
                     with chat_history_container:
-                        time.sleep(1)
                         with st.chat_message("assistant"):
-                            st.markdown(response)
+                            st.markdown(generated_response)
+                            # st.write_stream(response["generate"]["generation"])
                     # Add assistant response to chat history
-                    st.session_state.messages.append({"role": "assistant", "content": response})
+                    st.session_state.messages.append({"role": "assistant", "content": generated_response})
 
             # Add CSS to ensure chat input stays at the bottom and chat history scrolls
             st.markdown(

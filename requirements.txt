@@ -3,3 +3,4 @@ langchain-community
 pdfplumber
 python-dotenv
 streamlit
+langgraph
