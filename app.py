@@ -222,7 +222,6 @@ def streamlit_app():
         layout="wide",
         initial_sidebar_state="expanded"
     )
-    st.header("Candidate Assessment powered by watsonx 💬")
     
     # Initialize assessment state and chat history state
     if "individual_assessment" not in st.session_state:
@@ -273,6 +272,8 @@ def streamlit_app():
     col1, col2 = st.columns(2)
     
     with col1:
+        st.header("Candidate Assessment powered by watsonx 💬")
+        
         st.write("Upload job posting and cadidate CVs then click generate.")    
         uploaded_job_file = st.file_uploader("Choose Job Posting PDF files",  type=["pdf"], accept_multiple_files=False)
         uploaded_cv_files = st.file_uploader("Choose Candidate CV PDF files",  type=["pdf"], accept_multiple_files=True)
@@ -421,13 +422,13 @@ def streamlit_app():
                 .st-key-user-input {
                     position: fixed;
                     bottom: 10px;
-                    width: 100%;
+                    width: 35vw;
                 }
                 .st-key-chat-history {
                     position: fixed;
                     bottom: 70px;
-                    width: 35vw;
-                    height: 420px;
+                    width: 34vw;
+                    height: 65vh;
                     overflow: auto;
                     
                     
@@ -436,7 +437,7 @@ def streamlit_app():
                 .st-key-wrapper-chat-history{
                     position: fixed;
                     bottom: 5px;
-                    height: 550px;
+                    height: 85vh;
                     width: 37vw;
                     padding: 12px;
                     border: 1px solid white;
