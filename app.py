@@ -119,30 +119,12 @@ generate_text_prompt = PromptTemplate.from_template(
 
 json_schema= """
 ```json
-    {
-    "type": "object",
-    "properties": {
-        "name": {
-        "type": "string"
-        },
-        "suitability": {
-        "type": "string",
-        "enum": ["High", "Medium", "Low"]
-        },
-        "score": {
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 100
-        },
-        "recommended": {
-        "type": "string",
-        "enum": ["Yes", "No"]
-        },
-        "detailed_assessment": {
-        "type": "string"
-        }
-    },
-    "required": ["suitability", "score", "recommended", "detailed_assessment"]
+    {   
+        "name": string,
+        "suitability": string,
+        "score": int,
+        "recommended": string,
+        "detailed_assessment": string 
     }
     
 """    
@@ -150,12 +132,21 @@ generate_json_prompt=PromptTemplate.from_template(
     """
     You are an experience HR Recruiter. Your task is to assess candidates based on their resume and the job posting.
     Your assessment must include 3 main points: 
-        1. Name: Name of the candidate
+        1. Candidate Name: Name of the candidate
         2. Suitability: High, Medium, Low
         3. Score: 1-100
         4. Recommended: Yes/No
-        5. Detailed assessment: a detailed assessment report on how you came up with the 3 main points. Discuss a detailed report on suitability, score, and recommendation. Detailed assessment must be in a markdown format but it will be stored in a single-line string.   
-   
+        5. Detailed Assessment: a detailed assessment report on how you came up with the 3 main points. Discuss a detailed report on suitability, score, and recommendation. Detailed assessment must be in a markdown format but it will be stored in a single-line string.
+    
+        For example: 
+            Candidate Name: Juan Dela Cruz
+            Suitability: High
+            Score: 90
+            Recommended: Yes
+            Detailed Assessment:
+            • With over 20 years of experience, he meets the requirement of 5+ years of experience in the job.\n\n
+            • His experience as a consultant for as an academic mentor demonstrates his problem-solving, communication, and collaboration skills.\n\n
+
     Your response must be ONE valid JSON only in this JSON specification:
     {json_schema}
     
@@ -169,6 +160,8 @@ generate_json_prompt=PromptTemplate.from_template(
     {candidate_resume_text}
     
     # JSON response:
+
+
     """
     )   
 
@@ -359,7 +352,7 @@ def streamlit_app():
                         
             
 
-            st.subheader("Assessment Summary", divider="gray")
+            # st.subheader("Assessment Summary", divider="gray")
             df = pd.DataFrame(assessment_report)
             # print(df)
             # filter out the detailed assessment in the table summary.
