@@ -202,14 +202,18 @@ def display_detailed_assessments(individual_assessments):
     if len(individual_assessments)  > 0:
         st.subheader("Detailed Assessments", divider="gray")
         for assessment in individual_assessments:
-            with st.expander(f"{assessment['name']}"):
-                st.write(f"Candidate Name: {assessment['name']}")
-                st.write(f"Suitability: {assessment['suitability']}")
-                st.write(f"Score: {assessment['score']}")
-                st.write(f"Recommended: {assessment['recommended']}")
+            try: 
+                with st.expander(f"{assessment['name']}"):
+                    st.write(f"Candidate Name: {assessment['name']}")
+                    st.write(f"Suitability: {assessment['suitability']}")
+                    st.write(f"Score: {assessment['score']}")
+                    st.write(f"Recommended: {assessment['recommended']}")
+                    
+                    st.write("Detailed Assessment")
+                    st.write(assessment["detailed_assessment"])
+            except Exception as e:
+                st.error(f"An error occurred fetching detailed assessment.")
                 
-                st.write("Detailed Assessment")
-                st.write(assessment["detailed_assessment"])
 
 def streamlit_app():
     st.set_page_config(
@@ -301,31 +305,35 @@ def streamlit_app():
                             candidate_resume_text=value, 
                             job_posting_text=job_posting_extracted_text),
                         )
-                    logger.debug(f"json_string_output_raw:")
-                    logger.debug(json_string_output_raw)
-                    json_string_output_clean = json_string_output_raw[9:-3]
-                    logger.debug(f"json_string_output_clean:")
-                    logger.debug(json_string_output_clean)
-                    jsonify_output = json.loads(json_string_output_clean)
                     
-                    # Add extracted_cv_file_data to individual assessment state
-                    st.session_state.individual_assessment.append(jsonify_output)
-                    
-                    
-                    logger.debug(f"jsonify_output:")
-                    logger.debug(jsonify_output)
-                    assessment_report.append(jsonify_output)
-                    
-                    # st.write(jsonify_output)
-                    
-                    with st.expander(f"{jsonify_output['name']}"):
-                        st.write(f"Candidate Name: {jsonify_output['name']}")
-                        st.write(f"Suitability: {jsonify_output['suitability']}")
-                        st.write(f"Score: {jsonify_output['score']}")
-                        st.write(f"Recommended: {jsonify_output['recommended']}")
+                    try:
+                        logger.debug(f"json_string_output_raw:")
+                        logger.debug(json_string_output_raw)
+                        json_string_output_clean = json_string_output_raw[9:-3]
+                        logger.debug(f"json_string_output_clean:")
+                        logger.debug(json_string_output_clean)
+                        jsonify_output = json.loads(json_string_output_clean)
                         
-                        st.write("Detailed Assessment")
-                        st.write(jsonify_output["detailed_assessment"])
+                        # Add extracted_cv_file_data to individual assessment state
+                        st.session_state.individual_assessment.append(jsonify_output)
+                        
+                        logger.debug(f"jsonify_output:")
+                        logger.debug(jsonify_output)
+                        assessment_report.append(jsonify_output)
+                        # st.write(jsonify_output)
+                        with st.expander(f"{jsonify_output['name']}"):
+                            st.write(f"Candidate Name: {jsonify_output['name']}")
+                            st.write(f"Suitability: {jsonify_output['suitability']}")
+                            st.write(f"Score: {jsonify_output['score']}")
+                            st.write(f"Recommended: {jsonify_output['recommended']}")
+                            
+                            st.write("Detailed Assessment")
+                            st.write(jsonify_output["detailed_assessment"])
+                    except Exception as e:
+                        st.error(f"An error occurred in generating assessment for {key}")
+                        print(f"An error occurred in generating assessment for {key}: {e}")
+                        
+                        
                         
             
 
