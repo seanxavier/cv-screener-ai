@@ -92,30 +92,7 @@ def getLLM(model_id="meta-llama/llama-3-3-70b-instruct", max_new_tokens=2000, mi
             url = IBM_CLOUD_URL
             ),
             project_id=WATSONX_PROJECT_ID
-        )
-
-# DEPRECATED
-generate_text_prompt = PromptTemplate.from_template(
-    """
-    You are an experience HR Recruiter. Respond in a markdown format. Your task is to assess candidates based on their resume and the job posting.
-    Your assessment must include 3 main points: 
-        1. Suitability: High, Medium, Low
-        2. Score: 1-100
-        3. Recommended: Yes/No
-        
-    For example:
-    Name | Suitability | Score | Recommended
-    
-    Include a detailed assessment report on how you came up with the 3 main points.
-    
-    
-    Job Posting:
-    {job_posting_text}
-    
-    Candidate Resume:
-    {candidate_resume_text}
-    """
-    )   
+        ) 
 
 json_schema= """
 ```json
