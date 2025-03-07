@@ -435,7 +435,7 @@ def streamlit_app():
                 .st-key-chat-history {
                     position: fixed;
                     bottom: 70px;
-                    width: 35vw;
+                    width: 45vw;
                     height: 420px;
                     overflow: auto;
                     
@@ -446,7 +446,7 @@ def streamlit_app():
                     position: fixed;
                     bottom: 5px;
                     height: 550px;
-                    width: 37vw;
+                    width: 45vw;
                     padding: 12px;
                     border: 1px solid white;
                     border-radius: 10px;
