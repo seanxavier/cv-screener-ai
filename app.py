@@ -359,30 +359,16 @@ def streamlit_app():
                         
             
 
-            st.subheader("Assessment Summary", divider="gray")
             df = pd.DataFrame(assessment_report)
-            # print(df)
-            # filter out the detailed assessment in the table summary.
             df_overview = df[["name", "suitability", "score", "recommended"]].sort_values(by="score", ascending=False)
             
             # Add df_overview to overview assessment state
             st.session_state.overview_assessment.append(df_overview)
             
-            # st.dataframe(df_overview, column_config={
-            #     "Name": st.column_config.Column(label="Candidate Name",width="medium"), 
-            #     "Suitability": st.column_config.Column(label="Suitability",width="small"),
-            #     "Score": st.column_config.Column(label="Score",width="small"),
-            #     "Recommended": st.column_config.Column(label="Recommended",width="small"),
-            #     # "Detailed Assessment": st.column_config.Column(label="Detailed Assessment",width="large"),
-            #     },
-            #     hide_index=True)
         else:
             display_detailed_assessments(st.session_state.individual_assessment)
-            
-        # show indiv assessment every run using state history, this is done so that it will be displayed every interaction with chat
-        
-                
-        # show dataframe every run using state history, this is done so that it will be displayed every interaction with chat
+              
+        # show dataframe of indiv assessment every run using state history, this is done so that it will be displayed every interaction with chat
         for df_overview in st.session_state.overview_assessment:
             st.subheader("Assessment Summary", divider="gray")
             st.dataframe(df_overview, column_config={
