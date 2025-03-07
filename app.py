@@ -438,13 +438,10 @@ def streamlit_app():
                     bottom: 10px;
                     width: 100%;
                 }
-                .st-key-parent-chat-history > div {
-                    width: 500px;
-                }
                 .st-key-chat-history {
                     position: fixed;
                     bottom: 70px;
-                    width: 45vw;
+                    width: 35vw;
                     height: 420px;
                     overflow: auto;
                     
@@ -455,7 +452,7 @@ def streamlit_app():
                     position: fixed;
                     bottom: 5px;
                     height: 550px;
-                    width: 45vw;
+                    width: 37vw;
                     padding: 12px;
                     border: 1px solid white;
                     border-radius: 10px;
