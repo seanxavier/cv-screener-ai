@@ -360,25 +360,41 @@ def streamlit_app():
             
 
             df = pd.DataFrame(assessment_report)
-            df_overview = df[["name", "suitability", "score", "recommended"]].sort_values(by="score", ascending=False)
+            df_overview = df[["name", "suitability", "score", "recommended", "detailed_assessment"]].sort_values(by="score", ascending=False)
             
             # Add df_overview to overview assessment state
             st.session_state.overview_assessment.append(df_overview)
             
         else:
             display_detailed_assessments(st.session_state.individual_assessment)
+        
+        # Download to CSV button for the individual assessments (all)
+        if len(st.session_state.overview_assessment) != 0:
+            indiv_assessment_df_from_state= st.session_state.overview_assessment[0]
+            csv = indiv_assessment_df_from_state.to_csv(index=False)
+
+            st.download_button(
+                label="Download CSV",
+                data=csv,
+                file_name='Individual Assessments.csv',
+                mime='text/csv',
+            )
+    
               
         # show dataframe of indiv assessment every run using state history, this is done so that it will be displayed every interaction with chat
-        for df_overview in st.session_state.overview_assessment:
+        if len(st.session_state.overview_assessment) != 0:
+            df = pd.DataFrame( st.session_state.overview_assessment[0])
+            df_filtered = df[["name", "suitability", "score", "recommended"]]
             st.subheader("Assessment Summary", divider="gray")
-            st.dataframe(df_overview, column_config={
+            st.dataframe(df_filtered, column_config={
             "Name": st.column_config.Column(label="Candidate Name",width="medium"), 
             "Suitability": st.column_config.Column(label="Suitability",width="small"),
             "Score": st.column_config.Column(label="Score",width="small"),
-            "Recommended": st.column_config.Column(label="Recommended",width="small"),
-            # "Detailed Assessment": st.column_config.Column(label="Detailed Assessment",width="large"),
+            "Recommended": st.column_config.Column(label="Recommended",width="small")
             },
-            hide_index=True)        
+            hide_index=True)
+        
+           
     
     with col2:
         with st.container(key="wrapper-chat-history"):
