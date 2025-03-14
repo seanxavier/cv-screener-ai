@@ -21,4 +21,4 @@ memory = MemorySaver()
 # graphApp = workflow.compile(checkpointer=memory)
 graphApp = workflow.compile()
 
-graphApp.get_graph().draw_mermaid_png(output_file_path="graph.png")
+# graphApp.get_graph().draw_mermaid_png(output_file_path="graph.png")
