@@ -7,6 +7,22 @@ from ibm_watsonx_ai import Credentials
 from ibm_watsonx_ai.foundation_models import ModelInference
 from ibm_watsonx_ai.metanames import GenTextParamsMetaNames as GenParams
 from ibm_watsonx_ai.foundation_models.utils.enums import ModelTypes, DecodingMethods
+
+#docling
+from huggingface_hub import snapshot_download
+from docling.datamodel.pipeline_options import RapidOcrOptions
+from docling.datamodel.base_models import InputFormat
+from docling.datamodel.pipeline_options import (
+    AcceleratorDevice,
+    AcceleratorOptions,
+    PdfPipelineOptions,
+)
+from docling.document_converter import DocumentConverter, PdfFormatOption
+from ibm_watsonx_ai import APIClient
+from ibm_watsonx_ai.helpers import DataConnection, S3Location
+from ibm_watsonx_ai.foundation_models.extractions import TextExtractions
+from ibm_watsonx_ai.metanames import TextExtractionsMetaNames
+
 from langchain.prompts import PromptTemplate
 from langchain_community.document_loaders import PDFPlumberLoader
 
@@ -14,16 +30,23 @@ import tempfile
 
 import pandas as pd
 import json
+import numpy as np
 
 from dotenv import load_dotenv
 import time
 
 from graph.graph import graphApp
+
 load_dotenv()
 
 IBM_CLOUD_URL= os.environ["IBM_CLOUD_URL"]
 IBM_CLOUD_API_KEY=os.environ["IBM_CLOUD_API_KEY"]
 WATSONX_PROJECT_ID=os.environ["WATSONX_PROJECT_ID"]
+BUCKET_NAME=os.environ["BUCKET_NAME"]
+IBM_COS_ENDPOINT=os.environ["IBM_COS_ENDPOINT"]
+IBM_COS_API_KEY=os.environ["IBM_COS_API_KEY"]
+IBM_COS_ACCESS_KEY=os.environ["IBM_COS_ACCESS_KEY"]
+IBM_COS_SECRET_KEY=os.environ["IBM_COS_SECRET_KEY"]
 
 # Most GENAI logs are at Debug level.
 #  "DEBUG", "INFO", "WARNING"
@@ -140,12 +163,42 @@ generate_json_prompt=PromptTemplate.from_template(
 
 
     """
-    )   
+    )  
 
+#Extracting Text using Docling
+def extract_text_from_pdfs3(uploaded_files):
+    print("Downloading RapidOCR models")
+    download_path = snapshot_download(repo_id="SWHL/RapidOCR")
 
-def extract_text_from_pdfs(uploaded_files):
-    """Extracts text from multiple PDF files and stores it in a dictionary."""
+    # Setup RapidOcrOptions for english detection
+    det_model_path = os.path.join(
+        download_path, "PP-OCRv4", "en_PP-OCRv3_det_infer.onnx"
+    )
+    rec_model_path = os.path.join(
+        download_path, "PP-OCRv4", "ch_PP-OCRv4_rec_server_infer.onnx"
+    )
+    cls_model_path = os.path.join(
+        download_path, "PP-OCRv3", "ch_ppocr_mobile_v2.0_cls_train.onnx"
+    )
+    ocr_options = RapidOcrOptions(
+        det_model_path=det_model_path,
+        rec_model_path=rec_model_path,
+        cls_model_path=cls_model_path,
+    )
 
+    pipeline_options = PdfPipelineOptions(ocr_options=ocr_options)
+    # pipeline_options.do_ocr = True
+    pipeline_options.do_table_structure = True
+    pipeline_options.table_structure_options.do_cell_matching = True
+    pipeline_options.accelerator_options = AcceleratorOptions(
+        num_threads=8, device=AcceleratorDevice.CPU
+    )
+
+    doc_converter = DocumentConverter(
+        format_options={
+            InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
+        }
+    )
     all_extracted_text = {}  # Store extracted text for each file
 
     # IF single file only, st.file_uploader returns UploadedFile obj if it's restricted to accept single file
@@ -160,11 +213,17 @@ def extract_text_from_pdfs(uploaded_files):
                         temp_file.write(uploaded_file.read())
                         temp_file_path = temp_file.name
 
-                    loader = PDFPlumberLoader(temp_file_path)
-                    documents = loader.load()
-                    extracted_text = "\n".join([doc.page_content for doc in documents])
+                        extracted_text = doc_converter.convert(temp_file_path)
+                        converted_text = extracted_text.document.export_to_text()
+                    # with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+                    #     temp_file.write(uploaded_file.read())
+                    #     temp_file_path = temp_file.name
 
-                    all_extracted_text[uploaded_file.name] = extracted_text
+                    # loader = PDFPlumberLoader(temp_file_path)
+                    # documents = loader.load()
+                    # extracted_text = "\n".join([doc.page_content for doc in documents])
+                    print(converted_text)
+                    all_extracted_text[uploaded_file.name] = converted_text
 
             except Exception as e:
                 st.error(f"An error occurred with {uploaded_file.name}: {e}")
@@ -194,6 +253,195 @@ def extract_text_from_pdfs(uploaded_files):
 
     return all_extracted_text
 
+def get_extracted_text(extraction, extracted_ids, filenames):
+    all_extracted_text = {}
+
+    print("Downloading...")
+    for (extraction_id, filename)  in zip(extracted_ids, filenames):
+        filename = f"{filename}_extracted.txt"
+        results_reference = extraction.get_results_reference(extraction_id=extraction_id)
+        results_reference.download(filename=filename)
+        with open(filename, 'r', encoding="utf-8") as file:
+            extracted_text = file.read()
+
+        print(extracted_text)
+        all_extracted_text[filename] = extracted_text
+    print("Finished downloading...")
+
+    return all_extracted_text
+
+#Extracting Text using Watsonx Text Extraction
+def extract_text_from_pdfs2(uploaded_files):
+    datasource_name = 'bluemixcloudobjectstorage'
+    bucketname = BUCKET_NAME
+
+    #API CLient 
+    credentials = Credentials(url="https://us-south.ml.cloud.ibm.com",
+                            api_key=IBM_CLOUD_API_KEY)
+    client = APIClient(credentials=credentials, project_id=WATSONX_PROJECT_ID)
+
+    #Connect to COS
+    conn_meta_props= {
+        client.connections.ConfigurationMetaNames.NAME: f"Connection to Database - {datasource_name} ",
+        client.connections.ConfigurationMetaNames.DATASOURCE_TYPE: client.connections.get_datasource_type_id_by_name(datasource_name),
+        client.connections.ConfigurationMetaNames.DESCRIPTION: "Connection to external Database",
+        client.connections.ConfigurationMetaNames.PROPERTIES: {
+            'bucket': BUCKET_NAME,
+            'access_key': IBM_COS_ACCESS_KEY,
+            'secret_key': IBM_COS_SECRET_KEY,
+            'iam_url': 'https://iam.cloud.ibm.com/identity/token',
+            'url': IBM_COS_ENDPOINT
+        }
+    }
+
+    conn_details = client.connections.create(meta_props=conn_meta_props)
+    connection_asset_id = client.connections.get_id(conn_details)
+
+    extraction = TextExtractions(api_client=client,
+                             project_id=WATSONX_PROJECT_ID)
+    
+    all_extracted_text = {}  # Store extracted text for each file
+    extraction_ids = []
+    filenames = []
+
+    # IF single file only, st.file_uploader returns UploadedFile obj if it's restricted to accept single file
+    # ELSE, if multiple files, it returns a list of UploadedFiles
+    if not (isinstance(uploaded_files, UploadedFile)):
+        for index, uploaded_file in enumerate(uploaded_files):
+            try:
+                print(f"uploaded_file: {uploaded_file}")
+                
+                with st.spinner(f"Reading resumes ({index+1}/{len(uploaded_files)}): {uploaded_file.name}...", show_time=True):
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+                        temp_file.write(uploaded_file.read())
+                        temp_file_path = temp_file.name
+
+                    source_file_name = f"./files/{uploaded_file.name}"
+                    results_file_name = f"./files/{uploaded_file.name}_extracted.json"
+
+                    remote_document_reference = DataConnection(connection_asset_id=connection_asset_id,
+                                                location=S3Location(bucket = bucketname, path = "."))
+                    remote_document_reference.set_client(client)
+
+                    remote_document_reference.write(temp_file_path, remote_name=source_file_name)
+                    
+                    #Create Data Connection
+                    document_reference = DataConnection(connection_asset_id=connection_asset_id,
+                                    location=S3Location(bucket=bucketname,
+                                                        path=source_file_name))
+
+                    results_reference = DataConnection(connection_asset_id=connection_asset_id,
+                                                    location=S3Location(bucket=bucketname,
+                                                                        path=results_file_name))
+
+                    #Text Extraction Request
+                    
+                    steps = {TextExtractionsMetaNames.OCR: {'languages_list': ['en']},
+                            TextExtractionsMetaNames.TABLE_PROCESSING: {'enabled': True}}
+                    
+                    details = extraction.run_job(document_reference=document_reference, 
+                             results_reference=results_reference, 
+                             steps=steps,
+                             results_format="markdown")
+                    
+                    print(details)
+                    
+                    extraction_job_id = extraction.get_id(extraction_details=details)
+
+                    extraction_ids.append(extraction_job_id)
+                    
+                    filenames.append(uploaded_file.name)
+
+                    # with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+                    #     temp_file.write(uploaded_file.read())
+                    #     temp_file_path = temp_file.name
+
+                    # loader = PDFPlumberLoader(temp_file_path)
+                    # documents = loader.load()
+                    # extracted_text = "\n".join([doc.page_content for doc in documents])
+
+            except Exception as e:
+                st.error(f"An error occurred with {uploaded_file.name}: {e}")
+            finally:
+                if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
+                    os.remove(temp_file_path)
+        all_extracted_text = get_extracted_text(extraction, extraction_ids, filenames)
+    else:
+        try:
+            print(f"uploaded_file: {uploaded_files}")
+            with st.spinner(f"Reading job posting: {uploaded_files.name}... ", show_time=True):
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+                    temp_file.write(uploaded_files.read())
+                    temp_file_path = temp_file.name
+
+                loader = PDFPlumberLoader(temp_file_path)
+                documents = loader.load()
+                extracted_text = "\n".join([doc.page_content for doc in documents])
+
+                all_extracted_text[uploaded_files.name] = extracted_text
+
+        except Exception as e:
+            st.error(f"An error occurred with {uploaded_files.name}: {e}")
+        finally:
+            if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+        
+
+    return all_extracted_text
+
+
+def extract_text_from_pdfs(uploaded_files):
+    """Extracts text from multiple PDF files and stores it in a dictionary."""
+
+    all_extracted_text = {}  # Store extracted text for each file
+
+    # IF single file only, st.file_uploader returns UploadedFile obj if it's restricted to accept single file
+    # ELSE, if multiple files, it returns a list of UploadedFiles
+    if not (isinstance(uploaded_files, UploadedFile)):
+        for index, uploaded_file in enumerate(uploaded_files):
+            try:
+                print(f"uploaded_file: {uploaded_file}")
+                
+                with st.spinner(f"Reading resumes ({index+1}/{len(uploaded_files)}): {uploaded_file.name}...", show_time=True):
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+                        temp_file.write(uploaded_file.read())
+                        temp_file_path = temp_file.name
+
+                    loader = PDFPlumberLoader(temp_file_path)
+                    documents = loader.load()
+                    extracted_text = "\n".join([doc.page_content for doc in documents])
+
+                    print(extracted_text)    
+                    all_extracted_text[uploaded_file.name] = extracted_text
+                
+
+            except Exception as e:
+                st.error(f"An error occurred with {uploaded_file.name}: {e}")
+            finally:
+                if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
+                    os.remove(temp_file_path)
+    else:
+        try:
+            print(f"uploaded_file: {uploaded_files}")
+            with st.spinner(f"Reading job posting: {uploaded_files.name}... ", show_time=True):
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+                    temp_file.write(uploaded_files.read())
+                    temp_file_path = temp_file.name
+
+                loader = PDFPlumberLoader(temp_file_path)
+                documents = loader.load()
+                extracted_text = "\n".join([doc.page_content for doc in documents])
+
+                all_extracted_text[uploaded_files.name] = extracted_text
+
+        except Exception as e:
+            st.error(f"An error occurred with {uploaded_files.name}: {e}")
+        finally:
+            if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+        
+
+    return all_extracted_text
 
 
 ##### -----  START STREAMLIT APP  ######
@@ -289,10 +537,14 @@ def streamlit_app():
             
             # Exctract the pdf files
             extracted_job_file_data = extract_text_from_pdfs(uploaded_job_file)
+            print("hereeeee")
             job_posting_extracted_text = next(iter(extracted_job_file_data.values()))
+            print("hereeeeeeee2")
             st.session_state.job_posting.append(job_posting_extracted_text)
+            print("hereeeeee3")
             
-            extracted_cv_file_data = extract_text_from_pdfs(uploaded_cv_files)
+            extracted_cv_file_data = extract_text_from_pdfs2(uploaded_cv_files)
+
             st.session_state.resumes.append(extracted_cv_file_data)
             
                 
