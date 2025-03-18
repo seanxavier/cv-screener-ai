@@ -126,7 +126,6 @@ json_schema= """
         "recommended": string,
         "detailed_assessment": string 
     }
-    
 """    
 generate_json_prompt=PromptTemplate.from_template(
     """
@@ -147,7 +146,7 @@ generate_json_prompt=PromptTemplate.from_template(
             • With over 20 years of experience, he meets the requirement of 5+ years of experience in the job.\n\n
             • His experience as a consultant for as an academic mentor demonstrates his problem-solving, communication, and collaboration skills.\n\n
 
-    Your response must be ONE valid JSON only in this JSON specification:
+    Your response must be ONE valid JSON only in this JSON schema specified below:
     {json_schema}
     
     Do not return codes and code blocks.
@@ -253,12 +252,33 @@ def extract_text_from_pdfs3(uploaded_files):
 
     return all_extracted_text
 
+def get_client():
+    #API CLient 
+    credentials = Credentials(url="https://us-south.ml.cloud.ibm.com",
+                            api_key=IBM_CLOUD_API_KEY)
+    client = APIClient(credentials=credentials, project_id=WATSONX_PROJECT_ID)
+
+    return client
+
+#Delete files from COS
+def delete_files(client, filenames):
+
+    for filename in filenames:
+        response = client.delete_object(
+            Bucket=BUCKET_NAME,
+            Key=f"./files/{filename}",
+        )
+        response2 = client.delete_object(
+            Bucket=BUCKET_NAME,
+            Key=f"./files/{filename}_extracted.json",
+        )
+
 def get_extracted_text(extraction, extracted_ids, filenames):
     all_extracted_text = {}
 
     print("Downloading...")
     for (extraction_id, filename)  in zip(extracted_ids, filenames):
-        filename = f"{filename}_extracted.txt"
+        filename = f"/extracted_text/{filename}_extracted.txt"
         results_reference = extraction.get_results_reference(extraction_id=extraction_id)
         results_reference.download(filename=filename)
         with open(filename, 'r', encoding="utf-8") as file:
@@ -268,17 +288,20 @@ def get_extracted_text(extraction, extracted_ids, filenames):
         all_extracted_text[filename] = extracted_text
     print("Finished downloading...")
 
+    delete_files()
+    print("Deleted uploaded files to COS...")
+
     return all_extracted_text
 
 #Extracting Text using Watsonx Text Extraction
-def extract_text_from_pdfs2(uploaded_files):
+def extract_text_from_pdfs2(uploaded_files, client):
     datasource_name = 'bluemixcloudobjectstorage'
     bucketname = BUCKET_NAME
 
-    #API CLient 
-    credentials = Credentials(url="https://us-south.ml.cloud.ibm.com",
-                            api_key=IBM_CLOUD_API_KEY)
-    client = APIClient(credentials=credentials, project_id=WATSONX_PROJECT_ID)
+    # #API CLient 
+    # credentials = Credentials(url="https://us-south.ml.cloud.ibm.com",
+    #                         api_key=IBM_CLOUD_API_KEY)
+    # client = APIClient(credentials=credentials, project_id=WATSONX_PROJECT_ID)
 
     #Connect to COS
     conn_meta_props= {
@@ -518,6 +541,8 @@ def streamlit_app():
         )
     
     col1, col2 = st.columns(2)
+
+    client = get_client()
     
     with col1:
         st.header("Candidate Assessment powered by watsonx 💬")
@@ -543,7 +568,7 @@ def streamlit_app():
             st.session_state.job_posting.append(job_posting_extracted_text)
             print("hereeeeee3")
             
-            extracted_cv_file_data = extract_text_from_pdfs2(uploaded_cv_files)
+            extracted_cv_file_data = extract_text_from_pdfs2(uploaded_cv_files, client)
 
             st.session_state.resumes.append(extracted_cv_file_data)
             
