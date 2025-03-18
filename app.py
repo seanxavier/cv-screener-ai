@@ -288,9 +288,6 @@ def get_extracted_text(extraction, extracted_ids, filenames):
         all_extracted_text[filename] = extracted_text
     print("Finished downloading...")
 
-    delete_files()
-    print("Deleted uploaded files to COS...")
-
     return all_extracted_text
 
 #Extracting Text using Watsonx Text Extraction
@@ -389,6 +386,10 @@ def extract_text_from_pdfs2(uploaded_files, client):
                 if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
                     os.remove(temp_file_path)
         all_extracted_text = get_extracted_text(extraction, extraction_ids, filenames)
+
+        delete_files(client, filenames)
+        print("Deleted uploaded files to COS...")
+
     else:
         try:
             print(f"uploaded_file: {uploaded_files}")
