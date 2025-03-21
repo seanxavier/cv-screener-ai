@@ -23,6 +23,11 @@ from ibm_watsonx_ai.helpers import DataConnection, S3Location
 from ibm_watsonx_ai.foundation_models.extractions import TextExtractions
 from ibm_watsonx_ai.metanames import TextExtractionsMetaNames
 
+#COS
+import ibm_boto3
+from ibm_botocore.client import Config
+from ibm_botocore.exceptions import ClientError
+
 from langchain.prompts import PromptTemplate
 from langchain_community.document_loaders import PDFPlumberLoader
 
@@ -47,6 +52,10 @@ IBM_COS_ENDPOINT=os.environ["IBM_COS_ENDPOINT"]
 IBM_COS_API_KEY=os.environ["IBM_COS_API_KEY"]
 IBM_COS_ACCESS_KEY=os.environ["IBM_COS_ACCESS_KEY"]
 IBM_COS_SECRET_KEY=os.environ["IBM_COS_SECRET_KEY"]
+IBM_COS_SERVICE_ID=os.environ["IBM_COS_SERVICE_ID"]
+IBM_COS_AUTH_ENDPOINT=os.environ["IBM_COS_AUTH_ENDPOINT"]
+
+sourcefiles = []
 
 # Most GENAI logs are at Debug level.
 #  "DEBUG", "INFO", "WARNING"
@@ -119,13 +128,13 @@ def getLLM(model_id="meta-llama/llama-3-3-70b-instruct", max_new_tokens=2000, mi
 
 json_schema= """
 ```json
-    {   
-        "name": string,
+    {   "name": string,
         "suitability": string,
         "score": int,
         "recommended": string,
         "detailed_assessment": string 
     }
+```
 """    
 generate_json_prompt=PromptTemplate.from_template(
     """
@@ -146,8 +155,9 @@ generate_json_prompt=PromptTemplate.from_template(
             • With over 20 years of experience, he meets the requirement of 5+ years of experience in the job.\n\n
             • His experience as a consultant for as an academic mentor demonstrates his problem-solving, communication, and collaboration skills.\n\n
 
-    Your response must be ONE valid JSON only in this JSON schema specified below:
+    Your response must be ONE valid JSON only in this JSON schema specified below. Make sure that the JSON STRING is enclosed with curly brackets:
     {json_schema}
+    
     
     Do not return codes and code blocks.
     ONLY RETURN THE JSON STRING, DO NOT RETURN ANYTHING ELSE.
@@ -260,33 +270,54 @@ def get_client():
 
     return client
 
-#Delete files from COS
-def delete_files(client, filenames):
 
+def get_cos_client():
+    cos_client = ibm_boto3.client('s3',
+        ibm_api_key_id=IBM_COS_API_KEY,
+        ibm_service_instance_id=IBM_COS_SERVICE_ID,
+        ibm_auth_endpoint=IBM_COS_AUTH_ENDPOINT,
+        config=Config(signature_version='oauth'),
+        endpoint_url=IBM_COS_ENDPOINT
+    )
+
+    return cos_client
+
+#Delete files from COS
+def delete_files(filenames):
+
+    cos_client = get_cos_client()
+    
     for filename in filenames:
-        response = client.delete_object(
+        response = cos_client.delete_object(
             Bucket=BUCKET_NAME,
             Key=f"./files/{filename}",
         )
-        response2 = client.delete_object(
+        response2 = cos_client.delete_object(
             Bucket=BUCKET_NAME,
             Key=f"./files/{filename}_extracted.json",
         )
 
-def get_extracted_text(extraction, extracted_ids, filenames):
+def get_extracted_text(filenames):
     all_extracted_text = {}
 
-    print("Downloading...")
-    for (extraction_id, filename)  in zip(extracted_ids, filenames):
-        filename = f"/extracted_text/{filename}_extracted.txt"
-        results_reference = extraction.get_results_reference(extraction_id=extraction_id)
-        results_reference.download(filename=filename)
-        with open(filename, 'r', encoding="utf-8") as file:
-            extracted_text = file.read()
+    try:
+        # Create an IBM Cloud Object Storage client
+        cos_client = get_cos_client()
 
-        print(extracted_text)
-        all_extracted_text[filename] = extracted_text
-    print("Finished downloading...")
+        for filename in filenames:
+            print(f"Reading {filename}")
+            response = cos_client.get_object(Bucket=BUCKET_NAME, Key=f"./files/{filename}_extracted.json")
+            extracted_text = response['Body'].read().decode('utf-8')
+            print(extracted_text)
+            all_extracted_text[filename] = extracted_text
+
+        print("Finished reading extracted texts")
+
+    except ClientError as e:
+        if e.response['Error']['Code'] == '404':
+            print("Bucket or resource not found. Please check your configuration.")
+        else:
+            print(f"An error occurred: {e}")
 
     return all_extracted_text
 
@@ -294,11 +325,6 @@ def get_extracted_text(extraction, extracted_ids, filenames):
 def extract_text_from_pdfs2(uploaded_files, client):
     datasource_name = 'bluemixcloudobjectstorage'
     bucketname = BUCKET_NAME
-
-    # #API CLient 
-    # credentials = Credentials(url="https://us-south.ml.cloud.ibm.com",
-    #                         api_key=IBM_CLOUD_API_KEY)
-    # client = APIClient(credentials=credentials, project_id=WATSONX_PROJECT_ID)
 
     #Connect to COS
     conn_meta_props= {
@@ -323,7 +349,6 @@ def extract_text_from_pdfs2(uploaded_files, client):
     all_extracted_text = {}  # Store extracted text for each file
     extraction_ids = []
     filenames = []
-
     # IF single file only, st.file_uploader returns UploadedFile obj if it's restricted to accept single file
     # ELSE, if multiple files, it returns a list of UploadedFiles
     if not (isinstance(uploaded_files, UploadedFile)):
@@ -371,24 +396,16 @@ def extract_text_from_pdfs2(uploaded_files, client):
                     extraction_ids.append(extraction_job_id)
                     
                     filenames.append(uploaded_file.name)
-
-                    # with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
-                    #     temp_file.write(uploaded_file.read())
-                    #     temp_file_path = temp_file.name
-
-                    # loader = PDFPlumberLoader(temp_file_path)
-                    # documents = loader.load()
-                    # extracted_text = "\n".join([doc.page_content for doc in documents])
+                    sourcefiles.append(uploaded_file.name)
 
             except Exception as e:
                 st.error(f"An error occurred with {uploaded_file.name}: {e}")
             finally:
                 if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
                     os.remove(temp_file_path)
-        all_extracted_text = get_extracted_text(extraction, extraction_ids, filenames)
 
-        delete_files(client, filenames)
-        print("Deleted uploaded files to COS...")
+        print("Extracting Texts")            
+        all_extracted_text = get_extracted_text(filenames)
 
     else:
         try:
@@ -398,11 +415,42 @@ def extract_text_from_pdfs2(uploaded_files, client):
                     temp_file.write(uploaded_files.read())
                     temp_file_path = temp_file.name
 
-                loader = PDFPlumberLoader(temp_file_path)
-                documents = loader.load()
-                extracted_text = "\n".join([doc.page_content for doc in documents])
+                source_file_name = f"./files/{uploaded_files.name}"
+                results_file_name = f"./files/{uploaded_files.name}_extracted.json"
 
-                all_extracted_text[uploaded_files.name] = extracted_text
+                remote_document_reference = DataConnection(connection_asset_id=connection_asset_id,
+                                            location=S3Location(bucket = bucketname, path = "."))
+                remote_document_reference.set_client(client)
+
+                remote_document_reference.write(temp_file_path, remote_name=source_file_name)
+                
+                #Create Data Connection
+                document_reference = DataConnection(connection_asset_id=connection_asset_id,
+                                location=S3Location(bucket=bucketname,
+                                                    path=source_file_name))
+
+                results_reference = DataConnection(connection_asset_id=connection_asset_id,
+                                                location=S3Location(bucket=bucketname,
+                                                                    path=results_file_name))
+
+                #Text Extraction Request
+                steps = {TextExtractionsMetaNames.OCR: {'languages_list': ['en']},
+                        TextExtractionsMetaNames.TABLE_PROCESSING: {'enabled': True}}
+                
+                details = extraction.run_job(document_reference=document_reference, 
+                            results_reference=results_reference, 
+                            steps=steps,
+                            results_format="markdown")
+                
+                print(details)
+                
+                extraction_job_id = extraction.get_id(extraction_details=details)
+
+                extraction_ids.append(extraction_job_id)
+                
+                filenames.append(uploaded_files.name)
+                sourcefiles.append(uploaded_files.name)
+
 
         except Exception as e:
             st.error(f"An error occurred with {uploaded_files.name}: {e}")
@@ -410,7 +458,9 @@ def extract_text_from_pdfs2(uploaded_files, client):
             if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
         
-
+        print("Extracting Texts")            
+        all_extracted_text = get_extracted_text(filenames)
+        
     return all_extracted_text
 
 
@@ -559,15 +609,13 @@ def streamlit_app():
             
             
         assessment_report = []
+
         if st.button("Generate Assessment", disabled=generate_button_disabled):
             
             # Exctract the pdf files
-            extracted_job_file_data = extract_text_from_pdfs(uploaded_job_file)
-            print("hereeeee")
+            extracted_job_file_data = extract_text_from_pdfs2(uploaded_job_file, client)
             job_posting_extracted_text = next(iter(extracted_job_file_data.values()))
-            print("hereeeeeeee2")
             st.session_state.job_posting.append(job_posting_extracted_text)
-            print("hereeeeee3")
             
             extracted_cv_file_data = extract_text_from_pdfs2(uploaded_cv_files, client)
 
@@ -621,6 +669,10 @@ def streamlit_app():
             
             # Add df_overview to overview assessment state
             st.session_state.overview_assessment.append(df_overview)
+
+            print("Deleting files from COS")
+            delete_files(sourcefiles)
+            print("Done deleting")
             
         else:
             display_detailed_assessments(st.session_state.individual_assessment)

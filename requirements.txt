@@ -7,3 +7,4 @@ langgraph
 ibm-watsonx-ai>=1.1.15
 docling
 rapidocr_onnxruntime
+ibm-cos-sdk
