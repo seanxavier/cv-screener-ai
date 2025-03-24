@@ -9,15 +9,15 @@ from ibm_watsonx_ai.metanames import GenTextParamsMetaNames as GenParams
 from ibm_watsonx_ai.foundation_models.utils.enums import ModelTypes, DecodingMethods
 
 #docling
-from huggingface_hub import snapshot_download
-from docling.datamodel.pipeline_options import RapidOcrOptions
-from docling.datamodel.base_models import InputFormat
-from docling.datamodel.pipeline_options import (
-    AcceleratorDevice,
-    AcceleratorOptions,
-    PdfPipelineOptions,
-)
-from docling.document_converter import DocumentConverter, PdfFormatOption
+# from huggingface_hub import snapshot_download
+# from docling.datamodel.pipeline_options import RapidOcrOptions
+# from docling.datamodel.base_models import InputFormat
+# from docling.datamodel.pipeline_options import (
+#     AcceleratorDevice,
+#     AcceleratorOptions,
+#     PdfPipelineOptions,
+# )
+# from docling.document_converter import DocumentConverter, PdfFormatOption
 from ibm_watsonx_ai import APIClient
 from ibm_watsonx_ai.helpers import DataConnection, S3Location
 from ibm_watsonx_ai.foundation_models.extractions import TextExtractions
@@ -175,92 +175,92 @@ generate_json_prompt=PromptTemplate.from_template(
     )  
 
 #Extracting Text using Docling
-def extract_text_from_pdfs3(uploaded_files):
-    print("Downloading RapidOCR models")
-    download_path = snapshot_download(repo_id="SWHL/RapidOCR")
+# def extract_text_from_pdfs3(uploaded_files):
+#     print("Downloading RapidOCR models")
+#     download_path = snapshot_download(repo_id="SWHL/RapidOCR")
 
-    # Setup RapidOcrOptions for english detection
-    det_model_path = os.path.join(
-        download_path, "PP-OCRv4", "en_PP-OCRv3_det_infer.onnx"
-    )
-    rec_model_path = os.path.join(
-        download_path, "PP-OCRv4", "ch_PP-OCRv4_rec_server_infer.onnx"
-    )
-    cls_model_path = os.path.join(
-        download_path, "PP-OCRv3", "ch_ppocr_mobile_v2.0_cls_train.onnx"
-    )
-    ocr_options = RapidOcrOptions(
-        det_model_path=det_model_path,
-        rec_model_path=rec_model_path,
-        cls_model_path=cls_model_path,
-    )
+#     # Setup RapidOcrOptions for english detection
+#     det_model_path = os.path.join(
+#         download_path, "PP-OCRv4", "en_PP-OCRv3_det_infer.onnx"
+#     )
+#     rec_model_path = os.path.join(
+#         download_path, "PP-OCRv4", "ch_PP-OCRv4_rec_server_infer.onnx"
+#     )
+#     cls_model_path = os.path.join(
+#         download_path, "PP-OCRv3", "ch_ppocr_mobile_v2.0_cls_train.onnx"
+#     )
+#     ocr_options = RapidOcrOptions(
+#         det_model_path=det_model_path,
+#         rec_model_path=rec_model_path,
+#         cls_model_path=cls_model_path,
+#     )
 
-    pipeline_options = PdfPipelineOptions(ocr_options=ocr_options)
-    # pipeline_options.do_ocr = True
-    pipeline_options.do_table_structure = True
-    pipeline_options.table_structure_options.do_cell_matching = True
-    pipeline_options.accelerator_options = AcceleratorOptions(
-        num_threads=8, device=AcceleratorDevice.CPU
-    )
+#     pipeline_options = PdfPipelineOptions(ocr_options=ocr_options)
+#     # pipeline_options.do_ocr = True
+#     pipeline_options.do_table_structure = True
+#     pipeline_options.table_structure_options.do_cell_matching = True
+#     pipeline_options.accelerator_options = AcceleratorOptions(
+#         num_threads=8, device=AcceleratorDevice.CPU
+#     )
 
-    doc_converter = DocumentConverter(
-        format_options={
-            InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
-        }
-    )
-    all_extracted_text = {}  # Store extracted text for each file
+#     doc_converter = DocumentConverter(
+#         format_options={
+#             InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
+#         }
+#     )
+#     all_extracted_text = {}  # Store extracted text for each file
 
-    # IF single file only, st.file_uploader returns UploadedFile obj if it's restricted to accept single file
-    # ELSE, if multiple files, it returns a list of UploadedFiles
-    if not (isinstance(uploaded_files, UploadedFile)):
-        for index, uploaded_file in enumerate(uploaded_files):
-            try:
-                print(f"uploaded_file: {uploaded_file}")
+#     # IF single file only, st.file_uploader returns UploadedFile obj if it's restricted to accept single file
+#     # ELSE, if multiple files, it returns a list of UploadedFiles
+#     if not (isinstance(uploaded_files, UploadedFile)):
+#         for index, uploaded_file in enumerate(uploaded_files):
+#             try:
+#                 print(f"uploaded_file: {uploaded_file}")
                 
-                with st.spinner(f"Reading resumes ({index+1}/{len(uploaded_files)}): {uploaded_file.name}...", show_time=True):
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
-                        temp_file.write(uploaded_file.read())
-                        temp_file_path = temp_file.name
+#                 with st.spinner(f"Reading resumes ({index+1}/{len(uploaded_files)}): {uploaded_file.name}...", show_time=True):
+#                     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+#                         temp_file.write(uploaded_file.read())
+#                         temp_file_path = temp_file.name
 
-                        extracted_text = doc_converter.convert(temp_file_path)
-                        converted_text = extracted_text.document.export_to_text()
-                    # with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
-                    #     temp_file.write(uploaded_file.read())
-                    #     temp_file_path = temp_file.name
+#                         extracted_text = doc_converter.convert(temp_file_path)
+#                         converted_text = extracted_text.document.export_to_text()
+#                     # with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+#                     #     temp_file.write(uploaded_file.read())
+#                     #     temp_file_path = temp_file.name
 
-                    # loader = PDFPlumberLoader(temp_file_path)
-                    # documents = loader.load()
-                    # extracted_text = "\n".join([doc.page_content for doc in documents])
-                    print(converted_text)
-                    all_extracted_text[uploaded_file.name] = converted_text
+#                     # loader = PDFPlumberLoader(temp_file_path)
+#                     # documents = loader.load()
+#                     # extracted_text = "\n".join([doc.page_content for doc in documents])
+#                     print(converted_text)
+#                     all_extracted_text[uploaded_file.name] = converted_text
 
-            except Exception as e:
-                st.error(f"An error occurred with {uploaded_file.name}: {e}")
-            finally:
-                if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
-                    os.remove(temp_file_path)
-    else:
-        try:
-            print(f"uploaded_file: {uploaded_files}")
-            with st.spinner(f"Reading job posting: {uploaded_files.name}... ", show_time=True):
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
-                    temp_file.write(uploaded_files.read())
-                    temp_file_path = temp_file.name
+#             except Exception as e:
+#                 st.error(f"An error occurred with {uploaded_file.name}: {e}")
+#             finally:
+#                 if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
+#                     os.remove(temp_file_path)
+#     else:
+#         try:
+#             print(f"uploaded_file: {uploaded_files}")
+#             with st.spinner(f"Reading job posting: {uploaded_files.name}... ", show_time=True):
+#                 with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+#                     temp_file.write(uploaded_files.read())
+#                     temp_file_path = temp_file.name
 
-                loader = PDFPlumberLoader(temp_file_path)
-                documents = loader.load()
-                extracted_text = "\n".join([doc.page_content for doc in documents])
+#                 loader = PDFPlumberLoader(temp_file_path)
+#                 documents = loader.load()
+#                 extracted_text = "\n".join([doc.page_content for doc in documents])
 
-                all_extracted_text[uploaded_files.name] = extracted_text
+#                 all_extracted_text[uploaded_files.name] = extracted_text
 
-        except Exception as e:
-            st.error(f"An error occurred with {uploaded_files.name}: {e}")
-        finally:
-            if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
-                os.remove(temp_file_path)
+#         except Exception as e:
+#             st.error(f"An error occurred with {uploaded_files.name}: {e}")
+#         finally:
+#             if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
+#                 os.remove(temp_file_path)
         
 
-    return all_extracted_text
+#     return all_extracted_text
 
 def get_client():
     #API CLient 
@@ -303,6 +303,7 @@ def get_extracted_text(filenames):
     try:
         # Create an IBM Cloud Object Storage client
         cos_client = get_cos_client()
+        print(filenames)
 
         for filename in filenames:
             print(f"Reading {filename}")
@@ -346,6 +347,7 @@ def extract_text_from_pdfs2(uploaded_files, client):
     extraction = TextExtractions(api_client=client,
                              project_id=WATSONX_PROJECT_ID)
     
+   
     all_extracted_text = {}  # Store extracted text for each file
     extraction_ids = []
     filenames = []
@@ -395,6 +397,7 @@ def extract_text_from_pdfs2(uploaded_files, client):
 
                     extraction_ids.append(extraction_job_id)
                     
+                    print(uploaded_file.name)
                     filenames.append(uploaded_file.name)
                     sourcefiles.append(uploaded_file.name)
 
@@ -619,7 +622,7 @@ def streamlit_app():
             st.session_state.job_posting.append(job_posting_extracted_text)
             
             # extracted_cv_file_data = extract_text_from_pdfs3(uploaded_cv_files) #Using Docling
-            extracted_cv_file_data = extract_text_from_pdfs2(uploaded_cv_files) #Using watsonx Text Extraction
+            extracted_cv_file_data = extract_text_from_pdfs2(uploaded_cv_files, client) #Using watsonx Text Extraction
 
             st.session_state.resumes.append(extracted_cv_file_data)
             
