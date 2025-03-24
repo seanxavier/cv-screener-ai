@@ -614,10 +614,12 @@ def streamlit_app():
             
             # Exctract the pdf files
             extracted_job_file_data = extract_text_from_pdfs2(uploaded_job_file, client)
+            #extracted_job_file_data = extract_text_from_pdfs(uploaded_job_file)
             job_posting_extracted_text = next(iter(extracted_job_file_data.values()))
             st.session_state.job_posting.append(job_posting_extracted_text)
             
-            extracted_cv_file_data = extract_text_from_pdfs2(uploaded_cv_files, client)
+            # extracted_cv_file_data = extract_text_from_pdfs3(uploaded_cv_files) #Using Docling
+            extracted_cv_file_data = extract_text_from_pdfs2(uploaded_cv_files) #Using watsonx Text Extraction
 
             st.session_state.resumes.append(extracted_cv_file_data)
             
@@ -669,10 +671,6 @@ def streamlit_app():
             
             # Add df_overview to overview assessment state
             st.session_state.overview_assessment.append(df_overview)
-
-            print("Deleting files from COS")
-            delete_files(sourcefiles)
-            print("Done deleting")
             
         else:
             display_detailed_assessments(st.session_state.individual_assessment)
@@ -703,7 +701,9 @@ def streamlit_app():
             },
             hide_index=True)
         
-           
+            # print("Deleting files from COS")
+            # delete_files(sourcefiles)
+            # print("Done deleting")
     
     with col2:
         with st.container(key="wrapper-chat-history"):
