@@ -155,7 +155,7 @@ generate_json_prompt=PromptTemplate.from_template(
             • With over 20 years of experience, he meets the requirement of 5+ years of experience in the job.\n\n
             • His experience as a consultant for as an academic mentor demonstrates his problem-solving, communication, and collaboration skills.\n\n
 
-    Your response must be ONE valid JSON only in this JSON schema specified below. Make sure that the JSON STRING is enclosed with curly brackets:
+    Your response must be ONE valid JSON only in this JSON schema specified below. Make sure that the JSON is enclosed with curly brackets and follows the format of the schema below:
     {json_schema}
     
     
@@ -401,14 +401,26 @@ def extract_text_from_pdfs2(uploaded_files, client):
                     filenames.append(uploaded_file.name)
                     sourcefiles.append(uploaded_file.name)
 
+                    print("Extracting Texts") 
+                    status = "processing"
+                    while (status != "completed"): 
+                        status = extraction.get_job_details(extraction_id=extraction_job_id)['entity']['results']['status']
+                        print(f"Current status: {status}")
+                        if status == "completed": 
+                            all_extracted_text = get_extracted_text(filenames)
+                            print("Finished reading extracted texts")
+                            return all_extracted_text
+                        if status == "failed":
+                            print("Extraction failed.")
+                            return []
+                        else:
+                            continue     
+
             except Exception as e:
                 st.error(f"An error occurred with {uploaded_file.name}: {e}")
             finally:
                 if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
                     os.remove(temp_file_path)
-
-        print("Extracting Texts")            
-        all_extracted_text = get_extracted_text(filenames)
 
     else:
         try:
@@ -454,15 +466,26 @@ def extract_text_from_pdfs2(uploaded_files, client):
                 filenames.append(uploaded_files.name)
                 sourcefiles.append(uploaded_files.name)
 
+                print("Extracting Texts") 
+                status = "processing"
+                while (status != "completed"): 
+                    status = extraction.get_job_details(extraction_id=extraction_job_id)['entity']['results']['status']
+                    print(f"Current status: {status}")
+                    if status == "completed": 
+                        all_extracted_text = get_extracted_text(filenames)
+                        print("Finished reading extracted texts")
+                        return all_extracted_text
+                    if status == "failed":
+                        print("Extraction failed.")
+                        return []
+                    else:
+                        continue   
 
         except Exception as e:
             st.error(f"An error occurred with {uploaded_files.name}: {e}")
         finally:
             if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
-                os.remove(temp_file_path)
-        
-        print("Extracting Texts")            
-        all_extracted_text = get_extracted_text(filenames)
+                os.remove(temp_file_path)        
         
     return all_extracted_text
 
