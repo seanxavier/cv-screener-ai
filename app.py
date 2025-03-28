@@ -128,7 +128,8 @@ def getLLM(model_id="meta-llama/llama-3-3-70b-instruct", max_new_tokens=2000, mi
 
 json_schema= """
 ```json
-    {   "name": string,
+    {   
+        "name": string,
         "suitability": string,
         "score": int,
         "recommended": string,
@@ -138,13 +139,13 @@ json_schema= """
 """    
 generate_json_prompt=PromptTemplate.from_template(
     """
-    You are an experience HR Recruiter. Your task is to assess candidates based on their resume and the job posting.
+    You are an experienced HR Recruiter. Your task is to assess candidates based on their resume and the job posting.
     Your assessment must include 3 main points: 
         1. Candidate Name: Name of the candidate
         2. Suitability: High, Medium, Low
         3. Score: 1-100
         4. Recommended: Yes/No
-        5. Detailed Assessment: a detailed assessment report on how you came up with the 3 main points. Discuss a detailed report on suitability, score, and recommendation. Detailed assessment must be in a markdown format but it will be stored in a single-line string.
+        5. Detailed Assessment: a detailed assessment report on how you came up with the 3 main points. Discuss a detailed report on suitability, score, and recommendation. Add a new line for every new point.
     
         For example: 
             Candidate Name: Juan Dela Cruz
@@ -154,13 +155,13 @@ generate_json_prompt=PromptTemplate.from_template(
             Detailed Assessment:
             • With over 20 years of experience, he meets the requirement of 5+ years of experience in the job.\n\n
             • His experience as a consultant for as an academic mentor demonstrates his problem-solving, communication, and collaboration skills.\n\n
+            
 
-    Your response must be ONE valid JSON only in this JSON schema specified below. Make sure that the JSON is enclosed with curly brackets and follows the format of the schema below:
+    Your response must be ONE valid JSON following the JSON schema specified below:
     {json_schema}
     
-    
     Do not return codes and code blocks.
-    ONLY RETURN THE JSON STRING, DO NOT RETURN ANYTHING ELSE.
+    ONLY RETURN THE VALID JSON STRING, DO NOT RETURN ANYTHING ELSE.
     
     # Job Posting:
     {job_posting_text}
@@ -169,7 +170,6 @@ generate_json_prompt=PromptTemplate.from_template(
     {candidate_resume_text}
     
     # JSON response:
-
 
     """
     )  
@@ -399,29 +399,37 @@ def extract_text_from_pdfs2(uploaded_files, client):
                     
                     print(uploaded_file.name)
                     filenames.append(uploaded_file.name)
-                    sourcefiles.append(uploaded_file.name)
-
-                    print("Extracting Texts") 
-                    status = "processing"
-                    while (status != "completed"): 
-                        status = extraction.get_job_details(extraction_id=extraction_job_id)['entity']['results']['status']
-                        print(f"Current status: {status}")
-                        if status == "completed": 
-                            all_extracted_text = get_extracted_text(filenames)
-                            print("Finished reading extracted texts")
-                            return all_extracted_text
-                        if status == "failed":
-                            print("Extraction failed.")
-                            return []
-                        else:
-                            continue     
+                    sourcefiles.append(uploaded_file.name)    
 
             except Exception as e:
                 st.error(f"An error occurred with {uploaded_file.name}: {e}")
             finally:
                 if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
                     os.remove(temp_file_path)
-
+            
+        print("Extracting Texts") 
+        status = "processing"
+        count = 0
+        for filename in filenames:
+            with st.spinner(f"Extracting text: {filename}... ", show_time=True):
+                for extraction_id in extraction_ids:
+                    while (status != "completed"): 
+                        status = extraction.get_job_details(extraction_id=extraction_id)['entity']['results']['status']
+                        print(f"Current status: {status}")
+                        if status == "completed" and count == len(extraction_ids):
+                            print("Extracting texts")
+                            all_extracted_text = get_extracted_text(filenames)
+                            print("Finished reading extracted texts")
+                            return all_extracted_text
+                        elif status == "completed":
+                            count += 1
+                            status = "processing"
+                            print(count)
+                        elif status == "failed":
+                            print("Extraction failed.")
+                            return []
+                        else:
+                            continue 
     else:
         try:
             print(f"uploaded_file: {uploaded_files}")
@@ -466,26 +474,33 @@ def extract_text_from_pdfs2(uploaded_files, client):
                 filenames.append(uploaded_files.name)
                 sourcefiles.append(uploaded_files.name)
 
-                print("Extracting Texts") 
-                status = "processing"
-                while (status != "completed"): 
-                    status = extraction.get_job_details(extraction_id=extraction_job_id)['entity']['results']['status']
-                    print(f"Current status: {status}")
-                    if status == "completed": 
-                        all_extracted_text = get_extracted_text(filenames)
-                        print("Finished reading extracted texts")
-                        return all_extracted_text
-                    if status == "failed":
-                        print("Extraction failed.")
-                        return []
-                    else:
-                        continue   
-
+            print("Extracting Texts") 
+            status = "processing"
+            count = 0
+            for filename in filenames:
+                with st.spinner(f"Extracting text: {filename}... ", show_time=True):
+                    for extraction_id in extraction_ids:
+                        while (status != "completed"): 
+                            status = extraction.get_job_details(extraction_id=extraction_id)['entity']['results']['status']
+                            print(f"Current status: {status}")
+                            if status == "completed" and count == len(extraction_ids):
+                                print("Extracting texts")
+                                all_extracted_text = get_extracted_text(filenames)
+                                print("Finished reading extracted texts")
+                                return all_extracted_text
+                            elif status == "completed":
+                                count += 1
+                                status = "processing"
+                            elif status == "failed":
+                                print("Extraction failed.")
+                                return []
+                            else:
+                                continue 
         except Exception as e:
             st.error(f"An error occurred with {uploaded_files.name}: {e}")
         finally:
             if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
-                os.remove(temp_file_path)        
+                os.remove(temp_file_path)       
         
     return all_extracted_text
 
