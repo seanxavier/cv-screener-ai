@@ -2,6 +2,8 @@ from langchain_ibm import ChatWatsonx
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
+from ibm_watsonx_ai import APIClient, Credentials
+
 from langchain_core.runnables import RunnableSequence
 
 
@@ -10,21 +12,22 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-WATSONX_APIKEY = os.environ["IBM_CLOUD_API_KEY"]
+WATSONX_APIKEY = os.environ["WATSONX_APIKEY"]
 WATSONX_URL= os.environ["IBM_CLOUD_URL"]
 WATSONX_PROJECT_ID= os.environ["WATSONX_PROJECT_ID"]
+
 
 # 1st we define the llm
 parameters={
     
 }
 llm = ChatWatsonx(
-    model_id="ibm/granite-3-2-8b-instruct",
+    model_id="ibm/granite-3-3-8b-instruct",
     apikey=WATSONX_APIKEY,
     url=WATSONX_URL,
     project_id=WATSONX_PROJECT_ID,
     params=parameters,
-)
+    )
 
 # 2nd we write the system prompt
 system="""

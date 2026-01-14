@@ -45,7 +45,7 @@ from graph.graph import graphApp
 load_dotenv()
 
 IBM_CLOUD_URL= os.environ["IBM_CLOUD_URL"]
-IBM_CLOUD_API_KEY=os.environ["IBM_CLOUD_API_KEY"]
+IBM_CLOUD_API_KEY=os.environ["WATSONX_APIKEY"]
 WATSONX_PROJECT_ID=os.environ["WATSONX_PROJECT_ID"]
 BUCKET_NAME=os.environ["BUCKET_NAME"]
 IBM_COS_ENDPOINT=os.environ["IBM_COS_ENDPOINT"]
@@ -62,16 +62,16 @@ sourcefiles = []
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "DEBUG"))
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL='ibm/granite-3-2-8b-instruct'
+DEFAULT_MODEL='ibm/granite-3-3-8b-instruct'
 SUPPORTED_MODELS= [
                     # 'codellama/codellama-34b-instruct-hf', 
                 #    'google/flan-t5-xl', 
                 #    'google/flan-t5-xxl', 
                 #    'google/flan-ul2', 
-                #    'ibm/granite-13b-instruct-v2', 
+                   'ibm/granite-13b-instruct-v2', 
                 #    'ibm/granite-20b-code-instruct', 
                 #    'ibm/granite-20b-multilingual', 
-                   'ibm/granite-3-2-8b-instruct', 
+                #    'ibm/granite-3-2-8b-instruct', 
                 #    'ibm/granite-3-2-8b-instruct-preview-rc', 
                 #    'ibm/granite-3-2b-instruct', 
                 #    'ibm/granite-3-8b-instruct', 
@@ -88,11 +88,13 @@ SUPPORTED_MODELS= [
                 #    'meta-llama/llama-3-2-1b-instruct', 
                 #    'meta-llama/llama-3-2-3b-instruct', 
                 #    'meta-llama/llama-3-2-90b-vision-instruct', 
-                #    'meta-llama/llama-3-3-70b-instruct', 
+                   'meta-llama/llama-3-3-70b-instruct', 
                 #    'meta-llama/llama-3-405b-instruct', 
                 #    'meta-llama/llama-guard-3-11b-vision', 
-                   'mistralai/mistral-large', 
-                #    'mistralai/mixtral-8x7b-instruct-v01'
+                #    'mistralai/mistral-large', 
+                #    'mistralai/mixtral-8x7b-instruct-v01',
+                    'ibm/granite-3-3-8b-instruct'
+                
                    ]
 
 
@@ -137,6 +139,8 @@ json_schema= """
     }
 ```
 """    
+
+
 generate_json_prompt=PromptTemplate.from_template(
     """
     You are an experienced HR Recruiter. Your task is to assess candidates based on their resume and the job posting.
